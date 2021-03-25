@@ -19,7 +19,7 @@ int main(int argc, char *argv[]){
     char text[80],buf[BUF_SIZE];
     int	send_len,bytes_sent;
 
-        /* create socket for sending data */
+    /* create socket for sending data */
     sock_send=socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock_send < 0){
         printf("socket() failed\n");
@@ -43,14 +43,17 @@ int main(int argc, char *argv[]){
         /* send some data */
         printf("Send? ");
         scanf("%s",text);
-        if (strcmp(text,"quit") == 0)
-            break;
+        
 
         strcpy(buf,text);
         send_len=strlen(text);
         bytes_sent=send(sock_send,buf,send_len,0);
+        if (strcmp(text,"quit") == 0)
+            break;
     }
 
     close(sock_send);
 }
 
+
+// uid,type(FUNC,INT,TEXT),CELL1,CELL2(A2,C2)

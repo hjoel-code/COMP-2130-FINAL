@@ -1,83 +1,86 @@
 #include <stdio.h>
-#include <sys/types.h>	/* system type defintions */
-#include <sys/socket.h>	/* network system functions */
-#include <netinet/in.h>	/* protocol & struct definitions */
-#include <stdlib.h>	/* exit() warnings */
-#include <string.h>	/* memset warnings */
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
-#define BUF_SIZE	1024
-#define LISTEN_PORT	60000
+#define  PORT 4444
 
-int main(int argc, char *argv[]){
+int main()
+{
+    int serversoc,srec;
+    struct sockaddr_in serverAddr;
 
-    int	sock_listen,sock_recv;
-    struct sockaddr_in	my_addr,recv_addr;
-    int i,addr_size,bytes_received;
-    int	incoming_len;
-    struct sockaddr	remote_addr;
-    int	recv_msg_size;
-    char buf[BUF_SIZE];
-    int close_sock = 0;
+    int newsocket;
+    struct sockaddr_in newAddr;
+    char buffer[1024];
+    pid_t cpid;
 
+    socklen_t addr_size;
 
-            /* create socket for listening */
-    sock_listen=socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    
-    if (sock_listen < 0){
-        printf("socket() failed\n");
-        exit(0);
+    serversoc=socket(AF_INET,SOCK_STREAM,0);
+
+      if (serversoc < 0)
+    {
+        printf("Error in connection.\n");
+        exit(1);
     }
-        /* make local address structure */
-    
-    memset(&my_addr, 0, sizeof (my_addr));	/* zero out structure */
-    my_addr.sin_family = AF_INET;	/* address family */
-    my_addr.sin_addr.s_addr = htonl(INADDR_ANY);  /* current machine IP */
-    my_addr.sin_port = htons((unsigned short)LISTEN_PORT);
+    printf("Server Socket is created.\n");
 
-        /* bind socket to the local address */
-    i=bind(sock_listen, (struct sockaddr *) &my_addr, sizeof (my_addr));
-    if (i < 0){
-        printf("bind() failed\n");
-        exit(0);
+    memset(&serverAddr,'\0',sizeof(serverAddr));
+    serverAddr.sin_family=AF_INET;
+    serverAddr.sin_port=htons(PORT);
+    serverAddr.sin_addr.s_addr=inet_addr("127.0.0.1");
+
+    srec=bind(serversoc,(struct sockaddr*)&serverAddr,sizeof(serverAddr));
+    if (srec < 0)
+    {
+        printf("Error in binding.\n");
+        exit(1);
+    }
+
+    printf("Bind to port %d.\n",4444);
+
+    if (listen(serversoc,10)== 0)
+    {
+        printf("Listening...\n");
+    }
+    else
+    {
+        printf("Error in binding.\n");
     }
     
-    
-        /* listen ... */
-    
-    i=listen(sock_listen, 5);
-    if (i < 0){
-        printf("listen() failed\n");
-        exit(0);
-    }
-  /* get new socket to receive data on */
-        /* It extracts the first connection request from the  */
-        /* listening socket  */
-    
-
-
-
-    while (1) {
-        addr_size=sizeof(recv_addr);
-        sock_recv=accept(sock_listen, (struct sockaddr *) &recv_addr, &addr_size);
-
-
-        if (fork() == 0) {
-            close(sock_listen);
-            while (1) {
-                bytes_received=recv(sock_recv,buf,BUF_SIZE,0);
-                if (bytes_received <= 0)
-                    exit(0);
-
-                buf[bytes_received]=0;
-                printf("Received %d: %s \n",sock_recv,buf);
+    while (1)
+    {
+        newsocket=accept(serversoc,(struct sockaddr*)&newAddr,&addr_size);
+        if(newsocket<0)
+        {
+            exit(1);
+        }
+        printf("Connection acceptedd from %s:%d\n",inet_ntoa(newAddr.sin_addr),ntohs(newAddr.sin_port));
+        if ((cpid=fork())==0)
+        {
+            close(serversoc);
+            while(1)
+            {
+                recv(newsocket,buffer,1024,0);
+                if(strcmp(buffer,"stop")==0)
+                {
+                    printf("Disconnetd from %s:%d\n",inet_ntoa(newAddr.sin_addr),ntohs(newAddr.sin_port));
+                    break;
+                }
+                else
+                {
+                    printf("Client: %s\n",buffer);
+                    send(newsocket,buffer,strlen(buffer),0);
+                    bzero(buffer,sizeof(buffer));
+                }
             }
-            close(sock_recv);
-        } else {
-            printf("New Client\n");
         }
     }
-
+    close(newsocket);
     return 0;
 }
-

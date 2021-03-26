@@ -8,6 +8,7 @@
 #include <unistd.h> // for close
 #include <pthread.h>
 
+
 #define BUF_SIZE	1024
 #define LISTEN_PORT	60000
 
@@ -30,11 +31,9 @@ int user_count = 0;
 
 
 int searchUsers(int sock_recv) {
-        printf("\nlooking %d\n", user_count);
         for (int n = 0; n <=(user_count);n++) {
-            printf("\n%d : %d\n", users[n].sock_recv, sock_recv);
             if (users[n].sock_recv == sock_recv) {
-                printf("\nFOUND\n");
+                printf("FOUND\n");
                 break;
             }
         }
@@ -42,20 +41,21 @@ int searchUsers(int sock_recv) {
     }
 
 // Client Thread acts as listener for a specific client in various threads
-void *client_thread(void *arg)
-{
-	users[user_count].sock_recv = sock_recv;
-    user_count++;
+void *client_thread(void *arg) {
+    int sock = (int)(intptr_t)arg;
+    
+	users[user_count].sock_recv << sock;
+    user_count++; 
     while (1) {
-        bytes_received=recv(sock_recv,buf,BUF_SIZE,0);
+        bytes_received=recv(sock,buf,BUF_SIZE,0);
         if (strcmp(buf,"quit") == 0)
             break;
 
         buf[bytes_received]=0;
-        printf("Received %d: %s \n",sock_recv,buf);
-        searchUsers(sock_recv);
+        printf("Received %d: %s \n",sock,buf);
+        searchUsers(sock);
     }
-    close(sock_recv);
+    close(sock);
 }
 
 int main()
@@ -95,13 +95,13 @@ int main()
         addr_size=sizeof(recv_addr);
         sock_recv=accept(sock_listen, (struct sockaddr *) &recv_addr, &addr_size);
         
-        if (pthread_create(&thread_id, NULL, client_thread, NULL) != 0) {
+        if (pthread_create(&thread_id, NULL, client_thread, (void *)(intptr_t)sock_recv) != 0) {
             printf("Failed to connect client\n");
         } else {
             printf("New Client\n");
         }
-
     }
+
     close(sock_listen);
 	pthread_join(thread_id, NULL);
 

@@ -26,13 +26,13 @@ int main(int argc, char *argv[]){
         exit(0);
     }
 
-        /* create socket address structure to connect to */
+    /* create socket address structure to connect to */
     memset(&addr_send, 0, sizeof (addr_send)); /* zero out structure */
     addr_send.sin_family = AF_INET; /* address family */
     addr_send.sin_addr.s_addr = inet_addr(SERVER_IP);
     addr_send.sin_port = htons((unsigned short)SERVER_PORT);
 
-        /* connect to the server */
+    /* connect to the server */
     i=connect(sock_send, (struct sockaddr *) &addr_send, sizeof (addr_send));
     if (i < 0){
         printf("connect() failed\n");
@@ -57,3 +57,5 @@ int main(int argc, char *argv[]){
 
 
 // uid,type(FUNC,INT,TEXT),CELL1,CELL2(A2,C2)
+
+// uid:type:C3:A2B1

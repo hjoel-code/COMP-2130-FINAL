@@ -10,14 +10,204 @@
 
 #define BUF_SIZE	1024
 #define	SERVER_IP	"127.0.0.1"
-#define SERVER_PORT	60000
+#define SERVER_PORT	60001
 
 int main(int argc, char *argv[]){
     int	sock_send;
     struct sockaddr_in	addr_send;
     int	i;
     char text[80],buf[BUF_SIZE];
-    int	send_len,bytes_sent;
+    int	send_len,bytes_sent,bytes_received;
+
+    struct UserInput {
+        char coord[2];
+        int user;
+        char inp[10];
+    };
+
+    int uid;
+    struct UserInput user_inpts[82];
+    int input_count = 0;
+
+    char cell[3];
+    char cellVal[20];
+    char inpType[2];
+
+    // ++++++++ GRID FUNCTIONS ++++++++++++++++++++++++++++++++++
+
+    int k,j;
+    int const NUM_RANGE=9;
+
+    //global declaration structure grid
+    char * grid[NUM_RANGE][NUM_RANGE];
+
+    struct AlphIndex {
+        // Dictionary Structure to store the letter and score associated with a letter
+        char alph;
+        int index;
+        int width;
+    };
+
+    char alph[] = "ABCDEFGHI"; 
+    int index[] = {0,1,2,3,4,5,6,7,8};
+
+    struct AlphIndex alphIndex[NUM_RANGE]; 
+
+    // Mapping of the letters and their associated scores
+    for (j=0;j<NUM_RANGE;j++) {
+        alphIndex[j].alph = alph[j];
+        alphIndex[j].index = index[j];
+        alphIndex[j].width = 1;
+    };
+
+    // Method to search through an array of structures to identify which score matches the letter
+    int searchIndex(char letter) {
+        for (int n=0;n<NUM_RANGE;n++) {
+            if (alphIndex[n].alph == letter) {
+                return alphIndex[n].index;
+            }
+        }
+        return 0;
+    }
+
+    void drawBoard(){
+        //This function prints out the board that was passed. Returns void
+        char NLINE[200];
+        char HLINE[200];
+        char VLINE[200];
+        
+        strcpy(NLINE,"");
+        strcat(NLINE,"    ");
+
+        strcpy(HLINE,"");
+        strcat(HLINE,"  ");
+
+        strcpy(VLINE,"");
+        strcat(VLINE,"  ");
+        
+        for (int n = 0; n <= 8; n++) {
+            strcat(HLINE,"+---");
+            strcat(VLINE,"|   ");
+            if (alphIndex[n].width > 1) {
+                for (int w = 0; w <= alphIndex[n].width-2; w++) {
+                    strcat(HLINE,"-");
+                    strcat(VLINE," ");
+                }
+            }
+            for (int m = 0; m <= alphIndex[n].width-2; m++) {
+                strcat(NLINE," ");
+            }
+            strncat(NLINE,&alphIndex[n].alph,1);
+            strcat(NLINE,"    "); 
+            strcat(HLINE,"-");
+            strcat(VLINE," ");
+        }
+        strcat(HLINE,"+");
+        strcat(VLINE,"|");
+
+        printf("%s\n",NLINE);
+        printf("%s\n",HLINE);
+        for (j = 0; j < NUM_RANGE; j++)
+        {  
+            printf("%s\n",VLINE);
+            printf("%d ",j+1);
+            for (k = 0; k < NUM_RANGE; k++)
+            {  
+                if(strcmp(grid[k][j],"   ")==0){
+                    char space[40];
+                    strcpy(space,"   ");
+                    for (int m = 0; m <= alphIndex[k].width-2; m++) {
+                        strcat(space," ");
+                    }
+                    printf("| %s",space);
+                }else{
+                    if (alphIndex[k].width > strlen(grid[k][j])) {
+                        int dif = alphIndex[k].width - strlen(grid[k][j]);
+                        char input[30];
+                        strcpy(input,"");
+                        for (int m = 0; m <= dif-1; m++) {
+                            strcat(input," ");
+                        }
+                        strcat(input,grid[k][j]);
+                        printf("| %s  ",input);
+                    } else {
+                        printf("| %s  ",grid[k][j]);
+                    }
+                }
+            }
+            printf("%s","|");
+            printf("\n");
+            printf("%s\n",VLINE);
+            printf("%s\n",HLINE);
+        }
+        return;
+    }//EndFunction drawBoard
+
+    void getNewBoard(){
+            //creates a brand new blank board. Returns a pointer to the array 
+            for (j = 0; j < NUM_RANGE; j++){
+                for (k = 0; k < NUM_RANGE; k++)
+                {
+                    grid[k][j]="   ";
+                }//Endfor
+            }//Endfor
+            return;
+        }//EndFunction getNewBoard
+    
+    void makePlay(char alph, int y, char* c){
+        int x = searchIndex(alph);
+        int len = strlen(c);
+
+        if (alphIndex[x].width < len)
+            alphIndex[x].width = len;
+
+        grid[x][y-1]=c;
+        return;
+    }
+
+    int isOnBoard(char alph, int y) {
+        int x = searchIndex(alph);
+
+        if ((x <= NUM_RANGE && x > 0) && (y <= NUM_RANGE && y > 0)) {
+            return 1;
+        }
+
+        return -1;
+    }
+    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+    void updateClient(char *init) {
+        char *tok_end;
+        char *token = strtok_r(init, ":", &tok_end);
+
+        while (token != NULL) {
+
+            if (strlen(token) <= 3) {
+                printf("%s\n",token);
+                uid = atoi(token);
+            } else {
+                char *tok1_end;
+                char *token1 = strtok_r(token, ",", &tok1_end);
+                int var = 0;
+                while (token1 != NULL) {
+                    if (var == 0) {
+                        strcpy(user_inpts[input_count].coord,token1);
+                    } else if (var == 1) {
+                        user_inpts[input_count].user = atoi(token1);
+                    } else {
+                        strcpy(user_inpts[input_count].inp,token1);
+                    }
+                    token1 = strtok_r(NULL, ",", &tok1_end);
+                    var++;
+                }
+                makePlay(user_inpts[input_count].coord[0], user_inpts[input_count].coord[1]-'0', user_inpts[input_count].inp);
+                input_count++;
+            }
+            token = strtok_r(NULL, ":", &tok_end);
+        }
+    }
 
     /* create socket for sending data */
     sock_send=socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -39,10 +229,45 @@ int main(int argc, char *argv[]){
         exit(0);
     }
 
+    bytes_received = recv(sock_send,buf,BUF_SIZE,0);
+    buf[bytes_received] = 0;
+    printf("Received %d: %s \n",sock_send,buf);
+
+    getNewBoard();
+    updateClient(buf);
+    drawBoard();
+
+    void validateCellIndex(char *cell) {
+        while (1) {
+            if (cell[0] >= 'a' && cell[0] <= 'z')
+                cell[0] = cell[0] - 32;
+            
+            if (isOnBoard(cell[0], cell[1]-'0') ==  1)
+                break;
+            printf("Cell Index: ");
+            scanf("%s",cell);
+        }
+        return;
+    }
+
     while (1){
         /* send some data */
-        printf("Send? ");
-        scanf("%s",text);
+        printf("Cell Index: ");
+        scanf("%s",cell);
+        validateCellIndex(cell);
+
+        printf("\nValue: ");
+        scanf("%s",cellVal);
+        strcpy(inpType,"T");
+        sprintf(text,"%d",uid);
+        
+        strcat(text,":");
+        strcat(text,inpType);
+        strcat(text,":");
+        strcat(text,cell);
+        strcat(text,":");
+        strcat(text,cellVal);
+
         
 
         strcpy(buf,text);
@@ -59,3 +284,5 @@ int main(int argc, char *argv[]){
 // uid,type(FUNC,INT,TEXT),CELL1,CELL2(A2,C2)
 
 // uid:type:C3:A2B1
+
+

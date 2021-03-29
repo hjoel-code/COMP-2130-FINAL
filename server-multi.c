@@ -10,12 +10,13 @@
 
 
 #define BUF_SIZE	1024
-#define LISTEN_PORT	60000
+#define LISTEN_PORT	60001
 
 // Global Variables:
 int	sock_listen,sock_recv;
 struct sockaddr_in	my_addr,recv_addr;
 int i,addr_size,bytes_received;
+int	send_len,bytes_sent;
 int	incoming_len;
 struct sockaddr	remote_addr;
 int	recv_msg_size;
@@ -27,25 +28,65 @@ struct User {
     // List of cells adjusted
 };
 struct User users[20];
-int user_count = 0;
+int user_count = -1;
+
+
+struct UserInput {
+    char coord[2];
+    int user;
+    char inp[10];
+};
+
+struct UserInput user_inpts[82];
+int input_count = 0;
 
 
 int searchUsers(int sock_recv) {
         for (int n = 0; n <=(user_count);n++) {
             if (users[n].sock_recv == sock_recv) {
                 printf("FOUND\n");
-                break;
+                return n;
             }
         }
-        return 0;
+        return -1;
     }
+
+void updateGrid(char *msg) {
+
+    char cell[3];
+    char val[20];
+    char *tok;
+    char *token = strtok_r(msg,":",&tok);
+    int trk = 0;
+
+
+    while (token != NULL) {
+        if (trk == 0) {
+            user_inpts[input_count].user = atoi(token);
+        } else if (trk == 1) {
+            printf("%s\n",token);
+        } else if (trk == 2) {
+            strcpy(cell,token);
+        } else if (trk == 3) {
+            strcpy(val,token);
+        }
+        token = strtok_r(NULL,":",&tok);
+        trk++;
+    }
+    strcpy(user_inpts[input_count].coord,cell);
+    strcpy(user_inpts[input_count].inp,val);  
+
+    input_count++;
+    return;
+}
 
 // Client Thread acts as listener for a specific client in various threads
 void *client_thread(void *arg) {
-    int sock = (int)(intptr_t)arg;
-    
-	users[user_count].sock_recv << sock;
     user_count++; 
+            
+    int sock = (int)(intptr_t)arg;
+	users[user_count].sock_recv << sock;
+    
     while (1) {
         bytes_received=recv(sock,buf,BUF_SIZE,0);
         if (strcmp(buf,"quit") == 0)
@@ -53,7 +94,8 @@ void *client_thread(void *arg) {
 
         buf[bytes_received]=0;
         printf("Received %d: %s \n",sock,buf);
-        searchUsers(sock);
+        updateGrid(buf);
+
     }
     close(sock);
 }
@@ -98,7 +140,23 @@ int main()
         if (pthread_create(&thread_id, NULL, client_thread, (void *)(intptr_t)sock_recv) != 0) {
             printf("Failed to connect client\n");
         } else {
-            printf("New Client\n");
+            printf("New Client %d\n", input_count);
+            char ch[3];
+            sprintf(buf, "%d", user_count);
+            if (input_count > 0) {
+                for (int i = 0; i < input_count; i++) {
+                    strcat(buf,":");
+                    strcat(buf, user_inpts[i].coord);
+                    strcat(buf,",");
+                    sprintf(ch, "%d", user_inpts[i].user);
+                    strcat(buf, ch);
+                    strcat(buf,",");
+                    strcat(buf, user_inpts[i].inp);
+                }
+            }
+            
+
+            write(sock_recv, buf, strlen(buf));
         }
     }
 

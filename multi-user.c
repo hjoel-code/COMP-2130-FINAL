@@ -51,8 +51,6 @@ int main() {
         strcpy(NLINE,"");
         strcat(NLINE,"    ");
 
-
-
         strcpy(HLINE,"");
         strcat(HLINE,"  ");
 
@@ -128,6 +126,8 @@ int main() {
             return;
         }//EndFunction getNewBoard
     
+
+
     void makePlay(char alph, int y, char* c){
         int x = searchIndex(alph);
         int len = strlen(c);
@@ -137,6 +137,16 @@ int main() {
 
         grid[x][y-1]=c;
         return;
+    }
+
+    int isOnBoard(char alph, int y) {
+        int x = searchIndex(alph);
+
+        if ((x <= NUM_RANGE && x > 0) && (y <= NUM_RANGE && y > 0)) {
+            return 1;
+        }
+
+        return -1;
     }
 
     getNewBoard();

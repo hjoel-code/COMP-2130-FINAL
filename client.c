@@ -6,71 +6,66 @@
 #include <string.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <pthread.h>
 
 
 #define BUF_SIZE	1024
 #define	SERVER_IP	"127.0.0.1"
 #define SERVER_PORT	60001
+#define NUM_RANGE 9
 
-int main(int argc, char *argv[]){
-    int	sock_send;
-    struct sockaddr_in	addr_send;
-    int	i;
-    char text[80],buf[BUF_SIZE];
-    int	send_len,bytes_sent,bytes_received;
+int	sock_send;
+struct sockaddr_in	addr_send;
+int	i;
+char text[80],buf[BUF_SIZE];
+int	send_len,bytes_sent,bytes_received;
 
-    struct UserInput {
-        char coord[2];
-        int user;
-        char inp[10];
-    };
+struct UserInput {
+    char coord[2];
+    int user;
+    char inp[10];
+};
 
-    int uid;
-    struct UserInput user_inpts[82];
-    int input_count = 0;
+int uid;
+struct UserInput user_inpts[82];
+int input_count = 0;
 
-    char cell[3];
-    char cellVal[20];
-    char inpType[2];
+char cell[3];
+char cellVal[20];
+char inpType[2];
 
-    // ++++++++ GRID FUNCTIONS ++++++++++++++++++++++++++++++++++
 
-    int k,j;
-    int const NUM_RANGE=9;
+// ++++++++ GRID FUNCTIONS ++++++++++++++++++++++++++++++++++
 
-    //global declaration structure grid
-    char * grid[NUM_RANGE][NUM_RANGE];
+int k,j;
 
-    struct AlphIndex {
-        // Dictionary Structure to store the letter and score associated with a letter
-        char alph;
-        int index;
-        int width;
-    };
+//global declaration structure grid
+char * grid[NUM_RANGE][NUM_RANGE];
 
-    char alph[] = "ABCDEFGHI"; 
-    int index[] = {0,1,2,3,4,5,6,7,8};
+struct AlphIndex {
+    // Dictionary Structure to store the letter and score associated with a letter
+    char alph;
+    int index;
+    int width;
+};
 
-    struct AlphIndex alphIndex[NUM_RANGE]; 
+char alph[] = "ABCDEFGHI"; 
+int idx[] = {0,1,2,3,4,5,6,7,8};
 
-    // Mapping of the letters and their associated scores
-    for (j=0;j<NUM_RANGE;j++) {
-        alphIndex[j].alph = alph[j];
-        alphIndex[j].index = index[j];
-        alphIndex[j].width = 1;
-    };
+struct AlphIndex alphIndex[NUM_RANGE]; 
 
-    // Method to search through an array of structures to identify which score matches the letter
-    int searchIndex(char letter) {
-        for (int n=0;n<NUM_RANGE;n++) {
-            if (alphIndex[n].alph == letter) {
-                return alphIndex[n].index;
-            }
+
+// Method to search through an array of structures to identify which score matches the letter
+int searchIndex(char letter) {
+    for (int n=0;n<NUM_RANGE;n++) {
+        if (alphIndex[n].alph == letter) {
+            return alphIndex[n].index;
         }
-        return 0;
     }
+    return 0;
+}
 
-    void drawBoard(){
+void drawBoard(){
         //This function prints out the board that was passed. Returns void
         char NLINE[200];
         char HLINE[200];
@@ -143,7 +138,7 @@ int main(int argc, char *argv[]){
         return;
     }//EndFunction drawBoard
 
-    void getNewBoard(){
+void getNewBoard(){
             //creates a brand new blank board. Returns a pointer to the array 
             for (j = 0; j < NUM_RANGE; j++){
                 for (k = 0; k < NUM_RANGE; k++)
@@ -154,7 +149,7 @@ int main(int argc, char *argv[]){
             return;
         }//EndFunction getNewBoard
     
-    void makePlay(char alph, int y, char* c){
+void makePlay(char alph, int y, char* c){
         int x = searchIndex(alph);
         int len = strlen(c);
 
@@ -165,7 +160,7 @@ int main(int argc, char *argv[]){
         return;
     }
 
-    int isOnBoard(char alph, int y) {
+int isOnBoard(char alph, int y) {
         int x = searchIndex(alph);
 
         if ((x <= NUM_RANGE && x > 0) && (y <= NUM_RANGE && y > 0)) {
@@ -174,11 +169,9 @@ int main(int argc, char *argv[]){
 
         return -1;
     }
-    // ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-
-
-    void updateClient(char *init) {
+void updateClient(char *init) {
         char *tok_end;
         char *token = strtok_r(init, ":", &tok_end);
 
@@ -209,6 +202,49 @@ int main(int argc, char *argv[]){
         }
     }
 
+void *server_updates(void *arg) {
+        getNewBoard();
+        updateClient((char *)(intptr_t)arg);
+        drawBoard();
+        while(1) {
+            printf("Pending Updates...\n");
+            bytes_received = recv(sock_send,buf,BUF_SIZE,0);
+            buf[bytes_received] = 0;
+            printf("Received %d: %s \n",sock_send,buf);
+
+            char *token = strtok(token, ",");
+            int var = 0;
+            while (token != NULL) {
+                if (var == 0) {
+                    strcpy(user_inpts[input_count].coord,token);
+                } else if (var == 1) {
+                    user_inpts[input_count].user = atoi(token);
+                } else {
+                    strcpy(user_inpts[input_count].inp,token);
+                }
+                token = strtok(NULL, ",");
+                var++;
+            }
+
+            makePlay(user_inpts[input_count].coord[0], user_inpts[input_count].coord[1]-'0', user_inpts[input_count].inp);
+            input_count++;
+            drawBoard();
+        }
+
+        close(sock_send);
+    }
+
+
+int main(int argc, char *argv[]) {   
+
+    
+    // Mapping of the letters and their associated scores
+    for (j=0;j<NUM_RANGE;j++) {
+        alphIndex[j].alph = alph[j];
+        alphIndex[j].index = idx[j];
+        alphIndex[j].width = 1;
+    };
+
     /* create socket for sending data */
     sock_send=socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     if (sock_send < 0){
@@ -233,9 +269,13 @@ int main(int argc, char *argv[]){
     buf[bytes_received] = 0;
     printf("Received %d: %s \n",sock_send,buf);
 
-    getNewBoard();
-    updateClient(buf);
-    drawBoard();
+    
+    pthread_t thread_id;
+    int thread = pthread_create(&thread_id, NULL, server_updates, (void *)(intptr_t)buf);
+    
+    if (thread != 0) {
+        printf("Failed to connect to server for updates\n");
+    }
 
     void validateCellIndex(char *cell) {
         while (1) {
@@ -278,6 +318,7 @@ int main(int argc, char *argv[]){
     }
 
     close(sock_send);
+    pthread_join(thread_id, NULL);
 }
 
 

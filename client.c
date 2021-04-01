@@ -11,7 +11,7 @@
 
 #define BUF_SIZE	1024
 #define	SERVER_IP	"127.0.0.1"
-#define SERVER_PORT	60001
+#define SERVER_PORT	60000
 #define NUM_RANGE 9
 
 int	sock_send;
@@ -207,12 +207,12 @@ void *server_updates(void *arg) {
         updateClient((char *)(intptr_t)arg);
         drawBoard();
         while(1) {
-            printf("Pending Updates...\n");
+            printf("\nPress any key and ENTER to continue\n");
             bytes_received = recv(sock_send,buf,BUF_SIZE,0);
             buf[bytes_received] = 0;
-            printf("Received %d: %s \n",sock_send,buf);
-
-            char *token = strtok(token, ",");
+            printf("\nUpdate Received %d: %s \n",sock_send,buf);
+            char *tok;
+            char *token = strtok_r(buf, ",", &tok);
             int var = 0;
             while (token != NULL) {
                 if (var == 0) {
@@ -222,7 +222,7 @@ void *server_updates(void *arg) {
                 } else {
                     strcpy(user_inpts[input_count].inp,token);
                 }
-                token = strtok(NULL, ",");
+                token = strtok_r(NULL, ",", &tok);
                 var++;
             }
 
@@ -276,6 +276,7 @@ int main(int argc, char *argv[]) {
     if (thread != 0) {
         printf("Failed to connect to server for updates\n");
     }
+    
 
     void validateCellIndex(char *cell) {
         while (1) {
@@ -316,9 +317,10 @@ int main(int argc, char *argv[]) {
         if (strcmp(text,"quit") == 0)
             break;
     }
-
-    close(sock_send);
     pthread_join(thread_id, NULL);
+    close(sock_send);
+    
+    
 }
 
 

@@ -10,7 +10,7 @@
 
 
 #define BUF_SIZE	1024
-#define LISTEN_PORT	60001
+#define LISTEN_PORT	60000
 
 // Global Variables:
 int	sock_listen,sock_recv;
@@ -28,7 +28,7 @@ struct User {
     // List of cells adjusted
 };
 struct User users[20];
-int user_count = -1;
+int user_count = 0;
 
 
 struct UserInput {
@@ -52,7 +52,7 @@ int searchUsers(int sock_recv) {
     }
 
 void updateGrid(char *msg) {
-
+    printf("Message to send%s\n", msg);
     char cell[3];
     char val[20];
     char *tok;
@@ -76,17 +76,34 @@ void updateGrid(char *msg) {
     strcpy(user_inpts[input_count].coord,cell);
     strcpy(user_inpts[input_count].inp,val);  
 
+    
+
+    char ch[3];
+    char buf[40];
+    strcat(buf, user_inpts[input_count].coord);
+    strcat(buf,",");
+    sprintf(ch, "%d", user_inpts[input_count].user);
+    strcat(buf, ch);
+    strcat(buf,",");
+    strcat(buf, user_inpts[input_count].inp);
     input_count++;
+
+    printf("To send %d: %s\n", user_count, buf);
+
+    for (int i = 0; i < user_count; i++) {
+        write(users[i].sock_recv, buf, strlen(buf));
+        printf("\n%d - %d :Send\n",i,users[i].sock_recv);
+    }
+
     return;
 }
 
 // Client Thread acts as listener for a specific client in various threads
-void *client_thread(void *arg) {
-    user_count++; 
-            
+void *client_thread(void *arg) {   
     int sock = (int)(intptr_t)arg;
-	users[user_count].sock_recv << sock;
-    
+	users[user_count].sock_recv = sock;
+    printf("\n %d - %d : Sock = %d \n",user_count,users[user_count].sock_recv,sock);
+    user_count++; 
     while (1) {
         bytes_received=recv(sock,buf,BUF_SIZE,0);
         if (strcmp(buf,"quit") == 0)
@@ -154,8 +171,6 @@ int main()
                     strcat(buf, user_inpts[i].inp);
                 }
             }
-            
-
             write(sock_recv, buf, strlen(buf));
         }
     }

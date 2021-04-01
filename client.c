@@ -313,6 +313,7 @@ int main(int argc, char *argv[]) {
 
         strcpy(buf,text);
         send_len=strlen(text);
+        printf("\n%s\n",buf);
         bytes_sent=send(sock_send,buf,send_len,0);
         if (strcmp(text,"quit") == 0)
             break;

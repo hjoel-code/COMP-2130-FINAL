@@ -80,6 +80,7 @@ void updateGrid(char *msg) {
 
     char ch[3];
     char buf[40];
+    strcpy(buf,"");
     strcat(buf, user_inpts[input_count].coord);
     strcat(buf,",");
     sprintf(ch, "%d", user_inpts[input_count].user);

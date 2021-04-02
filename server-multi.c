@@ -131,6 +131,39 @@ void getRange(char *range_values, char *range1, char *range2) {
     return;
 }
 
+
+float sumRange(char *range_vals) {
+    char *val;
+
+    val = strtok(range_vals, ",");
+    float sum = 0.00;
+    while (val != NULL) {
+        sum += atof(val);
+        val = strtok(NULL, ",");
+        printf("%f\n",sum);
+    }
+    printf("%f\n",sum);
+    return sum;
+}
+
+
+float avgRange(char *range_vals) {
+    char *val;
+
+    val = strtok(range_vals, ",");
+    int count = 0;
+    float sum = 0.00;
+    while (val != NULL) {
+        sum += atof(val);
+        val = strtok(NULL, ",");
+        printf("%f\n",sum);
+        count++;
+    }
+    float avg = sum / (count-1);
+    printf("%f\n",avg);
+    return avg;
+}
+
 void updateGrid(char *msg) {
     printf("Message to send%s\n", msg);
     char cell[3];
@@ -160,39 +193,46 @@ void updateGrid(char *msg) {
         token = strtok_r(NULL,":",&tok);
         trk++;
     }
-
+    strcpy(user_inpts[input_count].coord,cell);
     if (type == 'F') {
-        char *cell;
+        char *cells;
         char cell1[2], cell2[2];
         int c_count = 0;
 
-        cell = strtok(range,",");
-        while (cell != NULL) {
+        cells = strtok(range,",");
+        while (cells != NULL) {
             if (c_count == 0) {
-                strcpy(cell1,cell);
+                strcpy(cell1,cells);
                 printf("Cell 1: %s\n", cell1);
             } else if (c_count == 1) {
-                strcpy(cell2,cell);
+                strcpy(cell2,cells);
                 printf("Cell 2: %s\n", cell2);
             }
-            cell = strtok(NULL, ",");
+            cells = strtok(NULL, ",");
             c_count++;
         }
 
         char range_vals[2*((NUM_RANGE*NUM_RANGE)-1)];
+        
         getRange(range_vals, cell1, cell2);
         printf("--- %s\n", range_vals);
+
         if (val[0] == 'S') {
+            sprintf(user_inpts[input_count].inp, "%.2f", sumRange(range_vals)); 
             printf("FIND SUM\n");
         } else if (val[0] == 'R') {
+            sprintf(user_inpts[input_count].inp, "%.2f", sumRange(range_vals)); 
             printf("FIND RANGE\n");
         } else if (val[0] == 'A') {
+            sprintf(user_inpts[input_count].inp, "%.2f", avgRange(range_vals)); 
             printf("FIND AVERAGE\n");
         }
+
+        printf("Cell ---- %s\n", user_inpts[input_count].coord);
+        makePlay(user_inpts[input_count].coord[0], user_inpts[input_count].coord[1]-'0', user_inpts[input_count].inp);
     } else {
-        strcpy(user_inpts[input_count].coord,cell);
         strcpy(user_inpts[input_count].inp,val);
-        makePlay(user_inpts[input_count].coord[0],user_inpts[input_count].coord[1]-'0', user_inpts[input_count].inp);
+        makePlay(user_inpts[input_count].coord[0], user_inpts[input_count].coord[1]-'0', user_inpts[input_count].inp);
     }
     
 

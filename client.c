@@ -398,8 +398,10 @@ int main(int argc, char *argv[]) {
         strcat(text,":");
 
         getInputType(text, cellVal);
+
         inpType = text[strlen(text)-1];
         strcat(text,":");
+        
         strcat(text,cell);
         strcat(text,":");
         

@@ -11,6 +11,10 @@
 
 #define BUF_SIZE	1024
 #define LISTEN_PORT	60000
+#define NUM_RANGE 9
+
+//global declaration structure grid
+char * grid[NUM_RANGE][NUM_RANGE];
 
 // Global Variables:
 int	sock_listen,sock_recv;
@@ -27,9 +31,9 @@ struct User {
     int sock_recv;
     // List of cells adjusted
 };
+
 struct User users[20];
 int user_count = 0;
-
 
 struct UserInput {
     char coord[2];
@@ -40,6 +44,43 @@ struct UserInput {
 struct UserInput user_inpts[82];
 int input_count = 0;
 
+struct AlphIndex {
+    // Dictionary Structure to store the letter and score associated with a letter
+    char alph;
+    int index;
+};
+
+char alph[] = "ABCDEFGHI"; 
+int idx[] = {0,1,2,3,4,5,6,7,8};
+
+struct AlphIndex alphIndex[NUM_RANGE]; 
+
+int searchIndex(char letter) {
+    for (int n=0;n<NUM_RANGE;n++) {
+        if (alphIndex[n].alph == letter) {
+            return alphIndex[n].index;
+        }
+    }
+    return 0;
+}
+
+void getNewBoard(){
+            //creates a brand new blank board. Returns a pointer to the array 
+            for (int j = 0; j < NUM_RANGE; j++){
+                for (int k = 0; k < NUM_RANGE; k++)
+                {
+                    grid[k][j]="   ";
+                }//Endfor
+            }//Endfor
+            return;
+        }//EndFunction getNewBoard
+
+void makePlay(char alph, int y, char* c){
+        printf("\n%c - %d\n",alph,y-1);
+        int x = searchIndex(alph);
+        grid[x][y-1]=c;
+        return;
+    }
 
 int searchUsers(int sock_recv) {
         for (int n = 0; n <=(user_count);n++) {
@@ -51,6 +92,45 @@ int searchUsers(int sock_recv) {
         return -1;
     }
 
+void getRange(char *range_values, char *range1, char *range2) {
+    int x1,x2,y1,y2;
+
+    int tmp;
+
+    float k;
+
+    x1 = searchIndex(range1[0]);
+    x2 = searchIndex(range2[0]);
+
+    if (x1 > x2) {
+        tmp = x1;
+        x1 = x2;
+        x2 = tmp;
+    }
+
+    y1 = (range1[1] - '0')-1;
+    y2 = (range2[1] - '0')-1;
+
+    if (y1 > y2) {
+        tmp = y1;
+        y1 = y2;
+        y2 = tmp;
+    }
+
+    strcpy(range_values, "");
+    for (int n=x1; n<=x2; n++) {
+        for (int m=y1; m<=y2; m++) {
+            k = atof(grid[n][m]);
+            printf("GRID[%d][%d]: %s\n",n,m,grid[n][m]);
+            if (k != 0) {
+                strcat(range_values, grid[n][m]);
+                strcat(range_values, ",");
+            }
+        }
+    }
+    return;
+}
+
 void updateGrid(char *msg) {
     printf("Message to send%s\n", msg);
     char cell[3];
@@ -58,24 +138,62 @@ void updateGrid(char *msg) {
     char *tok;
     char *token = strtok_r(msg,":",&tok);
     int trk = 0;
+    char range[6], type;
+
 
 
     while (token != NULL) {
         if (trk == 0) {
             user_inpts[input_count].user = atoi(token);
         } else if (trk == 1) {
+            type = token[0];
             printf("%s\n",token);
         } else if (trk == 2) {
             strcpy(cell,token);
         } else if (trk == 3) {
             strcpy(val,token);
+            printf("%s\n", token);
+        } else if (trk == 4) {
+            printf("%s\n", token);
+            strcpy(range,token);
         }
         token = strtok_r(NULL,":",&tok);
         trk++;
     }
-    strcpy(user_inpts[input_count].coord,cell);
-    strcpy(user_inpts[input_count].inp,val);  
 
+    if (type == 'F') {
+        char *cell;
+        char cell1[2], cell2[2];
+        int c_count = 0;
+
+        cell = strtok(range,",");
+        while (cell != NULL) {
+            if (c_count == 0) {
+                strcpy(cell1,cell);
+                printf("Cell 1: %s\n", cell1);
+            } else if (c_count == 1) {
+                strcpy(cell2,cell);
+                printf("Cell 2: %s\n", cell2);
+            }
+            cell = strtok(NULL, ",");
+            c_count++;
+        }
+
+        char range_vals[2*((NUM_RANGE*NUM_RANGE)-1)];
+        getRange(range_vals, cell1, cell2);
+        printf("--- %s\n", range_vals);
+        if (val[0] == 'S') {
+            printf("FIND SUM\n");
+        } else if (val[0] == 'R') {
+            printf("FIND RANGE\n");
+        } else if (val[0] == 'A') {
+            printf("FIND AVERAGE\n");
+        }
+    } else {
+        strcpy(user_inpts[input_count].coord,cell);
+        strcpy(user_inpts[input_count].inp,val);
+        makePlay(user_inpts[input_count].coord[0],user_inpts[input_count].coord[1]-'0', user_inpts[input_count].inp);
+    }
     
 
     char ch[3];
@@ -99,6 +217,8 @@ void updateGrid(char *msg) {
     return;
 }
 
+
+
 // Client Thread acts as listener for a specific client in various threads
 void *client_thread(void *arg) {   
     int sock = (int)(intptr_t)arg;
@@ -120,6 +240,13 @@ void *client_thread(void *arg) {
 
 int main()
 {
+    getNewBoard();
+    // Mapping of the letters and their associated scores
+    for (int j=0;j<NUM_RANGE;j++) {
+        alphIndex[j].alph = alph[j];
+        alphIndex[j].index = idx[j];
+    };
+
     /* create socket for listening */
     sock_listen=socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
     

@@ -32,7 +32,7 @@ int input_count = 0;
 
 char cell[3];
 char cellVal[20];
-char inpType[2];
+char inpType;
 
 
 // ++++++++ GRID FUNCTIONS ++++++++++++++++++++++++++++++++++
@@ -234,10 +234,105 @@ void *server_updates(void *arg) {
         close(sock_send);
     }
 
+void getInputType(char *res, char *val) {
+    int d = atoi(val);
+    float f = atof(val);
 
-int main(int argc, char *argv[]) {   
+    if (val[0] == '=') {
+        strcat(res, "F");
+        return;
+    } else if (d != 0) {
+        strcat(res, "N");
+        return;
+    } else if (f != 0) {
+        strcat(res, "N");
+        return;
+    } else {
+        strcat(res, "T");
+        return;
+    }
+}
+
+void getFunctionType(char *res, char *val) {
+    char f_type[20];
+    int len = strlen(val);
+    strcpy(f_type, "");
+    for (int n = 1; n < len; n++) {
+        if (val[n] == '(')
+            break;
+        strncat(f_type, &val[n], 1);
+    }
+
+    if (strcmp(f_type, "AVERAGE") == 0) {
+        strcat(res,"A");
+        return;
+    } else if (strcmp(f_type, "average") == 0) {
+        strcat(res,"A");
+        return;
+    } else if (strcmp(f_type, "SUM") == 0) {
+        strcat(res,"S");
+        return;
+    } else if (strcmp(f_type, "sum") == 0) {
+        strcat(res,"S");
+        return;
+    } else if (strcmp(f_type, "range") == 0) {
+        strcat(res,"R");
+        return;
+    } else if (strcmp(f_type, "RANGE") == 0) {
+        strcat(res,"R");
+        return;
+    } else {
+        strcpy(res,"INVALID-FUNCTION");
+        return;
+    }
+}
+
+void getFunctionRange(char *res, char *val) {
+    char ranges[20];
+    char lim;
+    int len = strlen(val);
+    strcpy(ranges, "");
 
     
+    for (int n = 1; n < len; n++) {
+        lim = val[n];
+        if (lim == '(') {
+            while (lim != ')') {
+                n++;
+                if (val[n] == ')') {
+                    lim = val[n];
+                } else {
+                    strncat(ranges, &val[n], 1);
+                }
+            }
+        } else if (lim == ')') {
+            break;
+        }
+    }
+
+    int chk = 0;
+    char *cell;
+    cell = strtok(ranges,",");
+
+
+    while (cell != NULL) {
+        if (cell[0] >= 'a' && cell[0] <= 'z')
+            cell[0] = cell[0] - 32;
+        
+        if (isOnBoard(cell[0], cell[1]-'0') == 1) {
+            strcat(res,cell);
+            if (chk == 0)
+                strcat(res,",");
+            cell = strtok(NULL,",");
+        } else {
+            strcpy(res,"INVALID-RANGE-CELL");
+            cell = NULL;
+        }
+        chk++;   
+    }
+}
+
+int main(int argc, char *argv[]) {  
     // Mapping of the letters and their associated scores
     for (j=0;j<NUM_RANGE;j++) {
         alphIndex[j].alph = alph[j];
@@ -272,7 +367,6 @@ int main(int argc, char *argv[]) {
     
     pthread_t thread_id;
     int thread = pthread_create(&thread_id, NULL, server_updates, (void *)(intptr_t)buf);
-    
     if (thread != 0) {
         printf("Failed to connect to server for updates\n");
     }
@@ -297,30 +391,49 @@ int main(int argc, char *argv[]) {
         scanf("%s",cell);
         validateCellIndex(cell);
 
-        printf("\nValue: ");
+        printf("Value: ");
         scanf("%s",cellVal);
-        strcpy(inpType,"T");
+
         sprintf(text,"%d",uid);
-        
         strcat(text,":");
-        strcat(text,inpType);
+
+        getInputType(text, cellVal);
+        inpType = text[strlen(text)-1];
         strcat(text,":");
         strcat(text,cell);
         strcat(text,":");
-        strcat(text,cellVal);
-
         
 
-        strcpy(buf,text);
-        send_len=strlen(text);
-        printf("\n%s\n",buf);
-        bytes_sent=send(sock_send,buf,send_len,0);
+        if (inpType == 'F') {
+            getFunctionType(text,cellVal);
+            if (strcmp(text, "INVALID-FUNCTION") == 0) {
+                printf("-- %s\n", text);
+            } else {
+                strcat(text,":");
+                getFunctionRange(text, cellVal);
+                if (strcmp(text, "INVALID-RANGE-CELL") == 0) {
+                    printf("-- %s\n", text);
+                } else {
+                    strcpy(buf,text);
+                    send_len=strlen(text);
+                    printf("\n%s\n",buf);
+                    bytes_sent=send(sock_send,buf,send_len,0);
+                }
+            }
+        } else {
+            strcat(text,cellVal);
+            strcpy(buf,text);
+            send_len=strlen(text);
+            printf("\n%s\n",buf);
+            bytes_sent=send(sock_send,buf,send_len,0);
+        }
+        
         if (strcmp(text,"quit") == 0)
             break;
     }
+    
     pthread_join(thread_id, NULL);
     close(sock_send);
-    
     
 }
 

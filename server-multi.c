@@ -27,6 +27,8 @@ int	recv_msg_size;
 char buf[BUF_SIZE];
 int close_sock = 0;
 
+pthread_t thread_id;
+
 struct User {
     int sock_recv;
     // List of cells adjusted
@@ -92,6 +94,16 @@ int searchUsers(int sock_recv) {
         return -1;
     }
 
+void removeUser(int user_index) {
+    for (int n = user_index; n < user_count; n++) {
+        users[n] = users[n+1];
+    }
+
+    user_count--;
+
+    return;
+}
+
 void getRange(char *range_values, char *range1, char *range2) {
     int x1,x2,y1,y2;
 
@@ -146,7 +158,6 @@ float sumRange(char *range_vals) {
     return sum;
 }
 
-
 float avgRange(char *range_vals) {
     char *val;
 
@@ -159,9 +170,33 @@ float avgRange(char *range_vals) {
         printf("%f\n",sum);
         count++;
     }
-    float avg = sum / (count-1);
+    float avg = sum / count;
     printf("%f\n",avg);
     return avg;
+}
+
+float rrange(char *range_vals) {
+    char *num;
+    float temp,temp2,ans=0;
+
+    num = strtok(range_vals,",");
+
+    temp=0;
+    temp2 = atof(num);
+    while (num != NULL)
+    {
+        if  (temp < (atof(num))){
+            temp=atof(num);
+        }
+        else if ((atof(num) < temp2)){
+            temp2= atof(num);
+        }
+
+        num = strtok(NULL,",");
+    }
+
+    ans=temp-temp2;
+    return ans;
 }
 
 void updateGrid(char *msg) {
@@ -221,7 +256,7 @@ void updateGrid(char *msg) {
             sprintf(user_inpts[input_count].inp, "%.2f", sumRange(range_vals)); 
             printf("FIND SUM\n");
         } else if (val[0] == 'R') {
-            sprintf(user_inpts[input_count].inp, "%.2f", sumRange(range_vals)); 
+            sprintf(user_inpts[input_count].inp, "%.2f", rrange(range_vals)); 
             printf("FIND RANGE\n");
         } else if (val[0] == 'A') {
             sprintf(user_inpts[input_count].inp, "%.2f", avgRange(range_vals)); 
@@ -257,7 +292,13 @@ void updateGrid(char *msg) {
     return;
 }
 
-
+void closeClients() {
+    strcpy(buf, "quit");
+    for (int i = 0; i < user_count; i++) {
+        write(users[i].sock_recv, buf, strlen(buf));
+        printf("\n%d - %d :Send\n",i,users[i].sock_recv);
+    }
+}
 
 // Client Thread acts as listener for a specific client in various threads
 void *client_thread(void *arg) {   
@@ -267,15 +308,26 @@ void *client_thread(void *arg) {
     user_count++; 
     while (1) {
         bytes_received=recv(sock,buf,BUF_SIZE,0);
-        if (strcmp(buf,"quit") == 0)
-            break;
-
-        buf[bytes_received]=0;
         printf("Received %d: %s \n",sock,buf);
-        updateGrid(buf);
-
+        if (strcmp(buf,"quit") == 0) {
+            int user_index = searchUsers(sock);
+            if (user_index == -1) {
+                printf("USER NOT FOUND\n");
+            } else {
+                removeUser(user_index);
+            }
+            break;
+        } else if (strcmp(buf, "quit-all") == 0) {
+            closeClients();
+        } else {
+            buf[bytes_received]=0;
+            printf("Received %d: %s \n",sock,buf);
+            updateGrid(buf);
+        }
     }
+    printf("DISCONNETCTED \n");
     close(sock);
+    pthread_exit(&thread_id);
 }
 
 int main()
@@ -315,7 +367,7 @@ int main()
         exit(0);
     }
 
-	pthread_t thread_id;
+	
 	printf("Pending Connection\n");
 
     while (1) {

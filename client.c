@@ -34,6 +34,8 @@ char cell[3];
 char cellVal[20];
 char inpType;
 
+pthread_t thread_id;
+
 
 // ++++++++ GRID FUNCTIONS ++++++++++++++++++++++++++++++++++
 
@@ -207,31 +209,44 @@ void *server_updates(void *arg) {
         updateClient((char *)(intptr_t)arg);
         drawBoard();
         while(1) {
-            printf("\nPress any key and ENTER to continue\n");
+            if (uid == 0) {
+                printf("\nENTER cell index to continue, 'quit' to exit or 'update' to update file: \n");
+            } else {
+                printf("\nENTER cell index to continue or 'quit' to exit: \n");
+            }
             bytes_received = recv(sock_send,buf,BUF_SIZE,0);
             buf[bytes_received] = 0;
             printf("\nUpdate Received %d: %s \n",sock_send,buf);
-            char *tok;
-            char *token = strtok_r(buf, ",", &tok);
-            int var = 0;
-            while (token != NULL) {
-                if (var == 0) {
-                    strcpy(user_inpts[input_count].coord,token);
-                } else if (var == 1) {
-                    user_inpts[input_count].user = atoi(token);
-                } else {
-                    strcpy(user_inpts[input_count].inp,token);
-                }
-                token = strtok_r(NULL, ",", &tok);
-                var++;
-            }
 
-            makePlay(user_inpts[input_count].coord[0], user_inpts[input_count].coord[1]-'0', user_inpts[input_count].inp);
-            input_count++;
-            drawBoard();
+            if (strcmp(buf, "quit") == 0) {
+                bytes_sent=send(sock_send,buf,strlen(buf),0);
+                break;
+            } else {
+                char *tok;
+                char *token = strtok_r(buf, ",", &tok);
+                int var = 0;
+                while (token != NULL) {
+                    if (var == 0) {
+                        strcpy(user_inpts[input_count].coord,token);
+                    } else if (var == 1) {
+                        user_inpts[input_count].user = atoi(token);
+                    } else {
+                        strcpy(user_inpts[input_count].inp,token);
+                    }
+                    token = strtok_r(NULL, ",", &tok);
+                    var++;
+                }
+
+                makePlay(user_inpts[input_count].coord[0], user_inpts[input_count].coord[1]-'0', user_inpts[input_count].inp);
+                input_count++;
+                drawBoard();
+            }
+            
         }
 
+        pthread_exit(&thread_id);
         close(sock_send);
+        exit(1);
     }
 
 void getInputType(char *res, char *val) {
@@ -365,7 +380,7 @@ int main(int argc, char *argv[]) {
     printf("Received %d: %s \n",sock_send,buf);
 
     
-    pthread_t thread_id;
+    
     int thread = pthread_create(&thread_id, NULL, server_updates, (void *)(intptr_t)buf);
     if (thread != 0) {
         printf("Failed to connect to server for updates\n");
@@ -387,56 +402,90 @@ int main(int argc, char *argv[]) {
 
     while (1){
         /* send some data */
-        printf("Cell Index: ");
+        if (uid == 0) {
+            printf("\nENTER cell index to continue, 'quit' to exit or 'save' to save spreadsheet: \n");
+        } else {
+            printf("\nENTER cell index to continue or 'quit' to exit: \n");
+        }
+
         scanf("%s",cell);
-        validateCellIndex(cell);
 
-        printf("Value: ");
-        scanf("%s",cellVal);
+        if (strcmp(cell, "quit") == 0) {
+            printf("\n EXITING \n");
+            if (uid == 0) {
+                // CLOSE EVERYONE
+                printf("Closing All\n");
+                strcpy(buf,"quit-all");
+                bytes_sent=send(sock_send,buf,strlen(buf),0);
+                break;
+            }
+            
+            if (uid != 0) {
+                // CLOSE SELF ONLY
+                pthread_cancel(thread_id);
+                printf("Closing Self\n");
+                strcpy(buf,"quit");
+                bytes_sent=send(sock_send,buf,strlen(buf),0);
+                break;
+            }
 
-        sprintf(text,"%d",uid);
-        strcat(text,":");
-
-        getInputType(text, cellVal);
-
-        inpType = text[strlen(text)-1];
-        strcat(text,":");
-        
-        strcat(text,cell);
-        strcat(text,":");
-        
-
-        if (inpType == 'F') {
-            getFunctionType(text,cellVal);
-            if (strcmp(text, "INVALID-FUNCTION") == 0) {
-                printf("-- %s\n", text);
+        } else if (strcmp(cell, "save") == 0) {
+            if (uid == 0) {
+                // CODE TO SEND INSTRUCTION TO UPDATE FILE
+                printf("\n SAVE SPREADSHEET\n");
             } else {
-                strcat(text,":");
-                getFunctionRange(text, cellVal);
-                if (strcmp(text, "INVALID-RANGE-CELL") == 0) {
-                    printf("-- %s\n", text);
-                } else {
-                    strcpy(buf,text);
-                    send_len=strlen(text);
-                    printf("\n%s\n",buf);
-                    bytes_sent=send(sock_send,buf,send_len,0);
-                }
+                printf("\n NO ACCESS SUPER USER ONLY \n");
             }
         } else {
-            strcat(text,cellVal);
-            strcpy(buf,text);
-            send_len=strlen(text);
-            printf("\n%s\n",buf);
-            bytes_sent=send(sock_send,buf,send_len,0);
+            validateCellIndex(cell);
+
+            printf("Value: ");
+            scanf("%s",cellVal);
+
+            sprintf(text,"%d",uid);
+            strcat(text,":");
+
+            getInputType(text, cellVal);
+
+            inpType = text[strlen(text)-1];
+            strcat(text,":");
+            
+            strcat(text,cell);
+            strcat(text,":");
+            
+
+            if (inpType == 'F') {
+                getFunctionType(text,cellVal);
+                if (strcmp(text, "INVALID-FUNCTION") == 0) {
+                    printf("-- %s\n", text);
+                } else {
+                    strcat(text,":");
+                    getFunctionRange(text, cellVal);
+                    if (strcmp(text, "INVALID-RANGE-CELL") == 0) {
+                        printf("-- %s\n", text);
+                    } else {
+                        strcpy(buf,text);
+                        send_len=strlen(text);
+                        printf("\n%s\n",buf);
+                        bytes_sent=send(sock_send,buf,send_len,0);
+                    }
+                }
+            } else {
+                strcat(text,cellVal);
+                strcpy(buf,text);
+                send_len=strlen(text);
+                printf("\n%s\n",buf);
+                bytes_sent=send(sock_send,buf,send_len,0);
+            }
         }
-        
-        if (strcmp(text,"quit") == 0)
-            break;
     }
     
     pthread_join(thread_id, NULL);
+    printf("DISCONNETCTED \n");
     close(sock_send);
     
+
+    return 0; 
 }
 
 

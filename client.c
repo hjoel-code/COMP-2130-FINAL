@@ -210,7 +210,7 @@ void *server_updates(void *arg) {
         drawBoard();
         while(1) {
             if (uid == 0) {
-                printf("\nENTER cell index to continue, 'quit' to exit or 'update' to update file: \n");
+                printf("\nENTER cell index to continue, 'quit' to exit or 'save' to save file: \n");
             } else {
                 printf("\nENTER cell index to continue or 'quit' to exit: \n");
             }
@@ -220,7 +220,8 @@ void *server_updates(void *arg) {
 
             if (strcmp(buf, "quit") == 0) {
                 bytes_sent=send(sock_send,buf,strlen(buf),0);
-                break;
+                close(bytes_sent);
+                exit(1);
             } else {
                 char *tok;
                 char *token = strtok_r(buf, ",", &tok);
@@ -346,6 +347,88 @@ void getFunctionRange(char *res, char *val) {
         chk++;   
     }
 }
+void saveWorksheet()
+{   //SAVING WORKSHEET TO FILE
+    FILE *ptr;
+    
+    ptr=fopen ("Worksheet","w");
+    
+    if (ptr==NULL){
+        printf("error");
+        exit(1);
+    }
+    printf("\nSaving...\n");
+    char NLINE[200];
+    char HLINE[200];
+    char VLINE[200];
+        
+    strcpy(NLINE,"");
+    strcat(NLINE,"    ");
+
+    strcpy(HLINE,"");
+    strcat(HLINE,"  ");
+
+    strcpy(VLINE,"");
+    strcat(VLINE,"  ");
+        
+    for (int n = 0; n <= 8; n++) {
+        strcat(HLINE,"+---");
+        strcat(VLINE,"|   ");
+        if (alphIndex[n].width > 1) {
+            for (int w = 0; w <= alphIndex[n].width-2; w++) {
+                strcat(HLINE,"-");
+                strcat(VLINE," ");
+            }
+        }
+        for (int m = 0; m <= alphIndex[n].width-2; m++) {
+            strcat(NLINE," ");
+        }
+        strncat(NLINE,&alphIndex[n].alph,1);
+        strcat(NLINE,"    "); 
+        strcat(HLINE,"-");
+        strcat(VLINE," ");
+    }
+    strcat(HLINE,"+");
+    strcat(VLINE,"|");
+
+    fprintf(ptr,"%s\n",NLINE);
+    fprintf(ptr,"%s\n",HLINE);
+    for (j = 0; j < NUM_RANGE; j++)
+    {  
+        fprintf(ptr,"%s\n",VLINE);
+        fprintf(ptr,"%d ",j+1);
+        for (k = 0; k < NUM_RANGE; k++)
+        {  
+            if(strcmp(grid[k][j],"   ")==0){
+                char space[40];
+                strcpy(space,"   ");
+                 for (int m = 0; m <= alphIndex[k].width-2; m++) {
+                    strcat(space," ");
+                }
+                fprintf(ptr,"| %s",space);
+            }else{
+                if (alphIndex[k].width > strlen(grid[k][j])) {
+                    int dif = alphIndex[k].width - strlen(grid[k][j]);
+                    char input[30];
+                    strcpy(input,"");
+                    for (int m = 0; m <= dif-1; m++) {
+                        strcat(input," ");
+                    }
+                    strcat(input,grid[k][j]);
+                    fprintf(ptr,"| %s  ",input);
+                } else {
+                    fprintf(ptr,"| %s  ",grid[k][j]);
+                }
+            }
+        }
+        fprintf(ptr,"%s","|");
+        fprintf(ptr,"\n");
+        fprintf(ptr,"%s\n",VLINE);
+        fprintf(ptr,"%s\n",HLINE);
+    }
+    fclose(ptr);
+    return;
+}
 
 int main(int argc, char *argv[]) {  
     // Mapping of the letters and their associated scores
@@ -417,6 +500,7 @@ int main(int argc, char *argv[]) {
                 printf("Closing All\n");
                 strcpy(buf,"quit-all");
                 bytes_sent=send(sock_send,buf,strlen(buf),0);
+                close(bytes_sent);
                 break;
             }
             
@@ -431,8 +515,9 @@ int main(int argc, char *argv[]) {
 
         } else if (strcmp(cell, "save") == 0) {
             if (uid == 0) {
-                // CODE TO SEND INSTRUCTION TO UPDATE FILE
-                printf("\n SAVE SPREADSHEET\n");
+                printf("\n SAVEING SPREADSHEET\n");
+                saveWorksheet();
+                printf("\nSAVED\n");
             } else {
                 printf("\n NO ACCESS SUPER USER ONLY \n");
             }

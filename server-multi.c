@@ -319,13 +319,16 @@ void *client_thread(void *arg) {
             break;
         } else if (strcmp(buf, "quit-all") == 0) {
             closeClients();
+            close(bytes_received);
+            break;
         } else {
             buf[bytes_received]=0;
             printf("Received %d: %s \n",sock,buf);
             updateGrid(buf);
         }
     }
-    printf("DISCONNETCTED \n");
+    printf("DISCONNETCTED \n"); 
+    close(sock_recv);
     close(sock);
     pthread_exit(&thread_id);
 }
@@ -394,7 +397,6 @@ int main()
             write(sock_recv, buf, strlen(buf));
         }
     }
-
     close(sock_listen);
 	pthread_join(thread_id, NULL);
 

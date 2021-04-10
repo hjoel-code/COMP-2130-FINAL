@@ -26,11 +26,11 @@ struct UserInput {
     char inp[10];
 };
 
-int uid;
+int user_count, uid = -1;
 struct UserInput user_inpts[82];
 int input_count = 0;
 
-char cell[3];
+char user_input[5];
 char cellVal[20];
 char inpType;
 
@@ -165,7 +165,7 @@ void makePlay(char alph, int y, char* c){
 int isOnBoard(char alph, int y) {
         int x = searchIndex(alph);
 
-        if ((x <= NUM_RANGE && x > 0) && (y <= NUM_RANGE && y > 0)) {
+        if ((x < NUM_RANGE && x >= 0) && (y <= NUM_RANGE && y >= 0)) {
             return 1;
         }
 
@@ -182,6 +182,11 @@ void updateClient(char *init) {
             if (strlen(token) <= 3) {
                 printf("%s\n",token);
                 uid = atoi(token);
+                if (uid == 0) {
+                    printf("\n=========================\nYOU ARE THE SUPERUSER\n====================\n");
+                } else {
+                    printf("\n=========================\nYOU ARE USER %d\n====================\n",uid);
+                }
             } else {
                 char *tok1_end;
                 char *token1 = strtok_r(token, ",", &tok1_end);
@@ -208,28 +213,31 @@ void *server_updates(void *arg) {
         getNewBoard();
         updateClient((char *)(intptr_t)arg);
         drawBoard();
+        if (uid == 0) {
+            printf("\nENTER cell index to continue, 'quit' to exit or 'save' to save spreadsheet: \n");
+        } else {
+            printf("\nENTER cell index to continue or 'quit' to exit: \n");
+        }
         while(1) {
-            if (uid == 0) {
-                printf("\nENTER cell index to continue, 'quit' to exit or 'save' to save file: \n");
-            } else {
-                printf("\nENTER cell index to continue or 'quit' to exit: \n");
-            }
+            
             bytes_received = recv(sock_send,buf,BUF_SIZE,0);
             buf[bytes_received] = 0;
             printf("\nUpdate Received %d: %s \n",sock_send,buf);
 
             if (strcmp(buf, "quit") == 0) {
                 bytes_sent=send(sock_send,buf,strlen(buf),0);
-                close(bytes_sent);
-                exit(1);
+                close(sock_send);
+                exit(0);
             } else {
                 char *tok;
                 char *token = strtok_r(buf, ",", &tok);
                 int var = 0;
                 while (token != NULL) {
                     if (var == 0) {
-                        strcpy(user_inpts[input_count].coord,token);
+                        user_count = atoi(token);
                     } else if (var == 1) {
+                        strcpy(user_inpts[input_count].coord,token);
+                    } else if (var == 2) {
                         user_inpts[input_count].user = atoi(token);
                     } else {
                         strcpy(user_inpts[input_count].inp,token);
@@ -241,13 +249,26 @@ void *server_updates(void *arg) {
                 makePlay(user_inpts[input_count].coord[0], user_inpts[input_count].coord[1]-'0', user_inpts[input_count].inp);
                 input_count++;
                 drawBoard();
+                if (uid == 0) {
+                    printf("\n=========================\nYOU ARE THE SUPERUSER\n========================\n");
+                } else {
+                    printf("\n=========================\nYOU ARE USER %d\n==========================\n",uid);
+                }
+                printf("\nCURRENT USER COUNT: %d\n", user_count);
+                if (uid == 0) {
+                    printf("\nENTER cell index to continue, 'quit' to exit or 'save' to save spreadsheet: \n");
+                } else {
+                    printf("\nENTER cell index to continue or 'quit' to exit: \n");
+                }
             }
+
+            
             
         }
 
         pthread_exit(&thread_id);
         close(sock_send);
-        exit(1);
+        exit(0);
     }
 
 void getInputType(char *res, char *val) {
@@ -347,88 +368,6 @@ void getFunctionRange(char *res, char *val) {
         chk++;   
     }
 }
-void saveWorksheet()
-{   //SAVING WORKSHEET TO FILE
-    FILE *ptr;
-    
-    ptr=fopen ("Worksheet","w");
-    
-    if (ptr==NULL){
-        printf("error");
-        exit(1);
-    }
-    printf("\nSaving...\n");
-    char NLINE[200];
-    char HLINE[200];
-    char VLINE[200];
-        
-    strcpy(NLINE,"");
-    strcat(NLINE,"    ");
-
-    strcpy(HLINE,"");
-    strcat(HLINE,"  ");
-
-    strcpy(VLINE,"");
-    strcat(VLINE,"  ");
-        
-    for (int n = 0; n <= 8; n++) {
-        strcat(HLINE,"+---");
-        strcat(VLINE,"|   ");
-        if (alphIndex[n].width > 1) {
-            for (int w = 0; w <= alphIndex[n].width-2; w++) {
-                strcat(HLINE,"-");
-                strcat(VLINE," ");
-            }
-        }
-        for (int m = 0; m <= alphIndex[n].width-2; m++) {
-            strcat(NLINE," ");
-        }
-        strncat(NLINE,&alphIndex[n].alph,1);
-        strcat(NLINE,"    "); 
-        strcat(HLINE,"-");
-        strcat(VLINE," ");
-    }
-    strcat(HLINE,"+");
-    strcat(VLINE,"|");
-
-    fprintf(ptr,"%s\n",NLINE);
-    fprintf(ptr,"%s\n",HLINE);
-    for (j = 0; j < NUM_RANGE; j++)
-    {  
-        fprintf(ptr,"%s\n",VLINE);
-        fprintf(ptr,"%d ",j+1);
-        for (k = 0; k < NUM_RANGE; k++)
-        {  
-            if(strcmp(grid[k][j],"   ")==0){
-                char space[40];
-                strcpy(space,"   ");
-                 for (int m = 0; m <= alphIndex[k].width-2; m++) {
-                    strcat(space," ");
-                }
-                fprintf(ptr,"| %s",space);
-            }else{
-                if (alphIndex[k].width > strlen(grid[k][j])) {
-                    int dif = alphIndex[k].width - strlen(grid[k][j]);
-                    char input[30];
-                    strcpy(input,"");
-                    for (int m = 0; m <= dif-1; m++) {
-                        strcat(input," ");
-                    }
-                    strcat(input,grid[k][j]);
-                    fprintf(ptr,"| %s  ",input);
-                } else {
-                    fprintf(ptr,"| %s  ",grid[k][j]);
-                }
-            }
-        }
-        fprintf(ptr,"%s","|");
-        fprintf(ptr,"\n");
-        fprintf(ptr,"%s\n",VLINE);
-        fprintf(ptr,"%s\n",HLINE);
-    }
-    fclose(ptr);
-    return;
-}
 
 int main(int argc, char *argv[]) {  
     // Mapping of the letters and their associated scores
@@ -467,7 +406,13 @@ int main(int argc, char *argv[]) {
     int thread = pthread_create(&thread_id, NULL, server_updates, (void *)(intptr_t)buf);
     if (thread != 0) {
         printf("Failed to connect to server for updates\n");
+        strcpy(buf,"quit");
+        bytes_sent = send(sock_send,buf,strlen(buf),0);
+        close(sock_send);
+        exit(0);
     }
+
+    
     
 
     void validateCellIndex(char *cell) {
@@ -491,38 +436,36 @@ int main(int argc, char *argv[]) {
             printf("\nENTER cell index to continue or 'quit' to exit: \n");
         }
 
-        scanf("%s",cell);
+        scanf("%s",user_input);
 
-        if (strcmp(cell, "quit") == 0) {
+        if (strcmp(user_input, "quit") == 0) {
             printf("\n EXITING \n");
             if (uid == 0) {
                 // CLOSE EVERYONE
                 printf("Closing All\n");
                 strcpy(buf,"quit-all");
                 bytes_sent=send(sock_send,buf,strlen(buf),0);
-                close(bytes_sent);
+                printf("\nSENT %d: %s\n",bytes_sent,buf);
                 break;
-            }
-            
-            if (uid != 0) {
+            } else {
                 // CLOSE SELF ONLY
                 pthread_cancel(thread_id);
                 printf("Closing Self\n");
                 strcpy(buf,"quit");
                 bytes_sent=send(sock_send,buf,strlen(buf),0);
+                printf("\nSENT %d: %s\n",bytes_sent,buf);
                 break;
             }
 
-        } else if (strcmp(cell, "save") == 0) {
+        } else if (strcmp(user_input, "save") == 0) {
             if (uid == 0) {
-                printf("\n SAVEING SPREADSHEET\n");
-                saveWorksheet();
-                printf("\nSAVED\n");
+                bytes_sent=send(sock_send,user_input,strlen(user_input),0);
+                printf("\nSENT %d: %s\n",bytes_sent,user_input);
             } else {
                 printf("\n NO ACCESS SUPER USER ONLY \n");
             }
         } else {
-            validateCellIndex(cell);
+            validateCellIndex(user_input);
 
             printf("Value: ");
             scanf("%s",cellVal);
@@ -535,7 +478,7 @@ int main(int argc, char *argv[]) {
             inpType = text[strlen(text)-1];
             strcat(text,":");
             
-            strcat(text,cell);
+            strcat(text,user_input);
             strcat(text,":");
             
 
@@ -550,17 +493,16 @@ int main(int argc, char *argv[]) {
                         printf("-- %s\n", text);
                     } else {
                         strcpy(buf,text);
-                        send_len=strlen(text);
                         printf("\n%s\n",buf);
-                        bytes_sent=send(sock_send,buf,send_len,0);
+                        bytes_sent=send(sock_send,buf,strlen(buf),0);
                     }
                 }
             } else {
                 strcat(text,cellVal);
                 strcpy(buf,text);
-                send_len=strlen(text);
-                printf("\n%s\n",buf);
-                bytes_sent=send(sock_send,buf,send_len,0);
+                
+                bytes_sent=send(sock_send,buf,strlen(buf),0);
+                printf("\nSENT %d: %s\n",bytes_sent,buf);
             }
         }
     }
@@ -572,10 +514,4 @@ int main(int argc, char *argv[]) {
 
     return 0; 
 }
-
-
-// uid,type(FUNC,INT,TEXT),CELL1,CELL2(A2,C2)
-
-// uid:type:C3:A2B1
-
 
